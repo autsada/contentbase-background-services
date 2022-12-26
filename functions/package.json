@@ -14,15 +14,20 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@google-cloud/video-intelligence": "^4.1.1",
+    "@google-cloud/vision": "^3.0.1",
     "axios": "^1.2.1",
-    "child-process-promise": "^2.2.1",
     "firebase-admin": "^11.4.0",
     "firebase-functions": "^4.1.1",
-    "mkdirp": "^1.0.4"
+    "heic-convert": "^1.2.4",
+    "mkdirp": "^1.0.4",
+    "raw-body": "^2.5.1",
+    "sharp": "^0.31.3"
   },
   "devDependencies": {
-    "@types/child-process-promise": "^2.2.2",
+    "@types/heic-convert": "^1.2.0",
     "@types/mkdirp": "^1.0.2",
+    "@types/sharp": "^0.31.0",
     "typescript": "^4.6.4"
   },
   "private": true
