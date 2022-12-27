@@ -1,6 +1,5 @@
 import * as functions from "firebase-functions"
 import vision from "@google-cloud/vision"
-import rawBody from "raw-body"
 import convert from "heic-convert"
 import sharp from "sharp"
 import path from "path"
@@ -34,11 +33,11 @@ export const processImages = functions
 
       // Check if the file exists.
       if (!filePath) {
-        functions.logger.log("Object not found")
+        logger.log("Object not found")
         return null
       }
 
-      // Check if the image content is adult for violence using Vision API.
+      // Check if the image content is adult or violence using Vision API.
       const isDetected = await imageSafeSearchDetection(
         `gs://${obj.bucket}/${filePath}`
       )
@@ -48,8 +47,8 @@ export const processImages = functions
         await rawBucket.file(filePath).delete()
       } else {
         // Get file buffer.
-        const file = rawBucket.file(filePath)
-        const fileBuffer = await rawBody(file.createReadStream())
+        const file = await rawBucket.file(filePath).download()
+        const fileBuffer = file[0]
         let transformedFileBuffer: Buffer | null = null
 
         // Get file info.

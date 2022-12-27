@@ -40,13 +40,13 @@ export const transcodeVideo = functions
       const filePath = obj.name
 
       if (!filePath) {
-        functions.logger.log("Object not found")
+        logger.log("Object not found")
         return null
       }
 
-      const objectType = obj.contentType
-      if (!objectType?.startsWith("video/")) {
-        functions.logger.log("Only transcode videos")
+      const contentType = obj.contentType
+      if (!contentType?.startsWith("video/")) {
+        logger.log("Only transcode videos")
         return null
       }
 
