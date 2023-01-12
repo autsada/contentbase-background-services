@@ -27,7 +27,7 @@ export const transcodeVideo = functions
   .runWith({
     minInstances,
     maxInstances: 100,
-    secrets: [cloudflarBaseURL, cloudflarAccountId, cloudflarApiToken],
+    secrets: [cloudflarAccountId, cloudflarApiToken],
     // Ensure the function has enough memory and time
     // to process large files
     timeoutSeconds: 300,
