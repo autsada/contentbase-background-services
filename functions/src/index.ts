@@ -12,6 +12,5 @@ export const cloudflarApiToken = defineSecret("CLOUDFLAR_API_TOKEN")
 export const cloudflarAccountId = defineSecret("CLOUDFLAR_ACCOUNT_ID")
 export const cloudflarBaseURL = defineString("CLOUDFLAR_BASE_URL")
 
-export * from "./authService"
 export * from "./imageService"
 export * from "./videoService"
