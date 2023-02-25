@@ -14,3 +14,4 @@ export const cloudflarBaseURL = defineString("CLOUDFLAR_BASE_URL")
 
 export * from "./imageService"
 export * from "./videoService"
+export * from "./userService"

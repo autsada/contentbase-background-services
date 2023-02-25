@@ -1,20 +1,20 @@
 import * as functions from "firebase-functions"
 import vision from "@google-cloud/vision"
-import convert from "heic-convert"
-import sharp from "sharp"
 import path from "path"
+import os from "os"
+import mkdirp from "mkdirp"
+import { promisify } from "util"
+import fs from "fs"
 
-import { minInstances, rawBucket, finalBucket } from "."
+import { minInstances, rawBucket } from "."
 
 const logger = functions.logger
-
-// File extension for the created JPEG files.
-const JPEG_EXTENSION = ".jpg"
+const REPLACEMENT_IMAGE_FILE_PATH = "contentbase/prohibited.png"
 
 /**
  * Process images uploaded to cloud functions
- * 1. Delete an uploaded image that is flagged as Adult or Violence.
- * 2. Convert to `jpg` and resize an image.
+ * 1. Delete the uploaded image that is flagged as Adult or Violence.
+ * 2. Resize the image.
  */
 export const processImages = functions
   .runWith({
@@ -37,71 +37,50 @@ export const processImages = functions
         return null
       }
 
-      // Check if the image content is adult or violence using Vision API.
+      // Get content type
+      const contentType = obj.contentType
+      if (!contentType?.startsWith("image/")) {
+        logger.log("Only format images")
+        return null
+      }
+
+      /**
+       * Check if the image content is adult or violence using Vision API.
+       * */
       const isDetected = await imageSafeSearchDetection(
         `gs://${obj.bucket}/${filePath}`
       )
 
       if (isDetected) {
+        logger.log("Adult or violent content detected")
         // Delete the image.
         await rawBucket.file(filePath).delete()
-      } else {
-        // Get file buffer.
-        const file = await rawBucket.file(filePath).download()
-        const fileBuffer = file[0]
-        let transformedFileBuffer: Buffer | null = null
 
-        // Get file info.
-        const fileType = obj.contentType
-        const fileSize = obj.size
-        const extName = path.extname(filePath)
-        const baseName = path.basename(filePath, extName)
-        const fileDir = path.dirname(filePath)
-        const newFilePath = path.normalize(
-          path.format({ dir: fileDir, name: baseName, ext: JPEG_EXTENSION })
+        // Replace the deleted image with the image that shows prohibited sign
+        // Construct temp file path to save the replacement image to
+        const tempFilePath = path.join(os.tmpdir(), filePath)
+        // Get the temp dir name from the file path
+        const tempFileDir = path.dirname(tempFilePath)
+        // Create the temp dir where the replacement image will be downloaded to.
+        await mkdirp(tempFileDir)
+        // Download the replacement image to the temp dir
+        const replacementFile = rawBucket.file(REPLACEMENT_IMAGE_FILE_PATH)
+        await replacementFile.download({ destination: tempFilePath })
+        logger.log(
+          "The replacement file has been downloaded to: ",
+          tempFilePath
         )
+        // Upload the replacment image back to the deleted file path
+        await rawBucket.upload(tempFilePath, {
+          destination: filePath,
+          resumable: true,
+        })
+        logger.log("Uploaded the replacement file to: ", filePath)
 
-        // Convert to `jpg` if it is not already.
-        // Use `heic-convert` for `heic` images as `sharp` doesn't support this format.
-        if (extName.endsWith("heic")) {
-          transformedFileBuffer = (await convert({
-            buffer: fileBuffer,
-            format: "JPEG",
-            quality: 1,
-          })) as Buffer
-        } else {
-          if (!fileType?.startsWith("image/jpeg")) {
-            transformedFileBuffer = await sharp(fileBuffer)
-              .toFormat("jpg", { mozjpeg: true })
-              .toBuffer()
-          }
-        }
-
-        // Resize depending on the image type.
-        // Resizing must come after converting otherwise `heic` will fail as `shart` doesn't support this format.
-        // Make sure to use `transformedFileBuffer` if not null.
-        // A. If it is a profile image.
-        if (fileDir.endsWith("avatars")) {
-          transformedFileBuffer = await sharp(
-            transformedFileBuffer || fileBuffer
-          )
-            .resize({ width: 640, height: 640, fit: "contain" })
-            .toBuffer()
-        } else {
-          // B. If it is NOT a profile image, resize if the file size is greater than 500,000 bytes.
-          if (Number(fileSize) > 500000) {
-            transformedFileBuffer = await sharp(
-              transformedFileBuffer || fileBuffer
-            )
-              .resize({ width: 1920, fit: "inside" })
-              .toBuffer()
-          }
-        }
-
-        // Save the transformed image (if not null) or the original one to the new bucket.
-        await finalBucket
-          .file(newFilePath)
-          .save(transformedFileBuffer || fileBuffer, { resumable: true })
+        // Unlink the downloaded replacement file to free up space
+        const unlink = promisify(fs.unlink)
+        await unlink(tempFilePath)
+        logger.log("Unlinked the downloaded file from: ", tempFilePath)
       }
 
       logger.log("Processing image finished")

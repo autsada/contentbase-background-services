@@ -2,6 +2,10 @@ import * as functions from "firebase-functions"
 import video from "@google-cloud/video-intelligence"
 import path from "path"
 import axios from "axios"
+import { promisify } from "util"
+import fs from "fs"
+import os from "os"
+import mkdirp from "mkdirp"
 
 import {
   minInstances,
@@ -21,6 +25,7 @@ const likelihoods = [
   "LIKELY",
   "VERY_LIKELY",
 ]
+const REPLACEMENT_VIDEO_FILE_PATH = "contentbase/annotate.mp4"
 
 // A background triggered function to transcode videos.
 export const transcodeVideo = functions
@@ -36,7 +41,7 @@ export const transcodeVideo = functions
   .storage.object()
   .onFinalize(async (obj) => {
     try {
-      // File path will be in the form of the storage foldler concatenate `/` and uuid without dashes, concatenate a dash and the original uploaded file name, for example `videos/ueib123aibid4576-video1.mp4` and this is unique.
+      // File path will be in the form of `{uid}/{handle}/{publish}/{uuidv4}/{filename}.mp4` and this is unique.
       const filePath = obj.name
 
       if (!filePath) {
@@ -55,8 +60,35 @@ export const transcodeVideo = functions
       )
 
       if (isAdult) {
+        logger.log("Adult or violent content detected")
         // Delete the video.
         await rawBucket.file(filePath).delete()
+
+        // Replace the deleted video with the video that shows prohibited sign
+        // Construct temp file path to save the replacement video to
+        const tempFilePath = path.join(os.tmpdir(), filePath)
+        // Get the temp dir name from the file path
+        const tempFileDir = path.dirname(tempFilePath)
+        // Create the temp dir where the replacement video will be downloaded to.
+        await mkdirp(tempFileDir)
+        // Download the replacement video to the temp dir
+        const replacementFile = rawBucket.file(REPLACEMENT_VIDEO_FILE_PATH)
+        await replacementFile.download({ destination: tempFilePath })
+        logger.log(
+          "The replacement file has been downloaded to: ",
+          tempFilePath
+        )
+        // Upload the replacment video back to the deleted file path
+        await rawBucket.upload(tempFilePath, {
+          destination: filePath,
+          resumable: true,
+        })
+        logger.log("Uploaded the replacement file to: ", filePath)
+
+        // Unlink the downloaded replacement file to free up space
+        const unlink = promisify(fs.unlink)
+        await unlink(tempFilePath)
+        logger.log("Unlinked the downloaded file from: ", tempFilePath)
       } else {
         const baseName = path.basename(filePath, path.extname(filePath))
         const extName = path.extname(filePath)
