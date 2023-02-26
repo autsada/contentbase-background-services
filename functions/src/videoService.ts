@@ -89,36 +89,37 @@ export const transcodeVideo = functions
         const unlink = promisify(fs.unlink)
         await unlink(tempFilePath)
         logger.log("Unlinked the downloaded file from: ", tempFilePath)
-      } else {
-        const baseName = path.basename(filePath, path.extname(filePath))
-        const extName = path.extname(filePath)
-        const fileName = path.format({ name: baseName, ext: extName })
-        // Get a download signed url.
-        const uploadedFile = rawBucket.file(filePath)
-        const signedURLs = await uploadedFile.getSignedUrl({
-          action: "read",
-          expires: Date.now() + 1000 * 60 * 60, // 1 hour from now
-        })
-        const downloadURL = signedURLs[0]
-        const cloudflarBaseURLValue = cloudflarBaseURL.value()
-        const cloudflarAccountIdValue = cloudflarAccountId.value()
-        const cloudflarApiTokenValue = cloudflarApiToken.value()
-        await axios({
-          method: "POST",
-          url: `${cloudflarBaseURLValue}/${cloudflarAccountIdValue}/stream/copy`,
-          headers: {
-            Authorization: `Bearer ${cloudflarApiTokenValue}`,
-            "Content-Type": "application/json",
-          },
-          data: {
-            url: downloadURL,
-            meta: {
-              name: fileName,
-              path: filePath,
-            },
-          },
-        })
       }
+
+      // Call Cloudflare Stream API to transcode the video
+      const baseName = path.basename(filePath, path.extname(filePath))
+      const extName = path.extname(filePath)
+      const fileName = path.format({ name: baseName, ext: extName })
+      // Get a download signed url.
+      const uploadedFile = rawBucket.file(filePath)
+      const signedURLs = await uploadedFile.getSignedUrl({
+        action: "read",
+        expires: Date.now() + 1000 * 60 * 60, // 1 hour from now
+      })
+      const downloadURL = signedURLs[0]
+      const cloudflarBaseURLValue = cloudflarBaseURL.value()
+      const cloudflarAccountIdValue = cloudflarAccountId.value()
+      const cloudflarApiTokenValue = cloudflarApiToken.value()
+      await axios({
+        method: "POST",
+        url: `${cloudflarBaseURLValue}/${cloudflarAccountIdValue}/stream/copy`,
+        headers: {
+          Authorization: `Bearer ${cloudflarApiTokenValue}`,
+          "Content-Type": "application/json",
+        },
+        data: {
+          url: downloadURL,
+          meta: {
+            name: fileName,
+            path: filePath,
+          },
+        },
+      })
 
       logger.log("Processing video finished")
       return null
