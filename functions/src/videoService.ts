@@ -41,7 +41,7 @@ export const transcodeVideo = functions
   .storage.object()
   .onFinalize(async (obj) => {
     try {
-      // File path will be in the form of `{uid}/{handle}/{publish}/{uuidv4}/{filename}.mp4` and this is unique.
+      // File path will be in the form of `{uid}/{handle}/{publish}/{publishId}/{filename}.mp4` and this is unique.
       const filePath = obj.name
 
       if (!filePath) {

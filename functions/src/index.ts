@@ -11,7 +11,9 @@ export const finalBucket = getStorage().bucket("contentbase-final")
 export const cloudflarApiToken = defineSecret("CLOUDFLAR_API_TOKEN")
 export const cloudflarAccountId = defineSecret("CLOUDFLAR_ACCOUNT_ID")
 export const cloudflarBaseURL = defineString("CLOUDFLAR_BASE_URL")
+export const webhookAuthKey = defineSecret("WEBHOOK_AUTH_KEY")
 
 export * from "./imageService"
 export * from "./videoService"
 export * from "./userService"
+export * from "./playbackService"
